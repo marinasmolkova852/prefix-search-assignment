@@ -1,0 +1,87 @@
+{
+  "settings": {
+    "analysis": {
+      "filter": {
+        "edge_15": {
+          "type": "edge_ngram",
+          "min_gram": 1,
+          "max_gram": 25
+        }
+      },
+      "char_filter": {
+        "translit": {
+          "type": "mapping",
+          "mappings": [
+            "й=>i", "ц=>c", "у=>u", "к=>k", "е=>e", "н=>n", "г=>g",
+            "ш=>sh", "щ=>shch", "з=>z", "х=>h", "ъ=>", "ф=>f", "ы=>y",
+            "в=>v", "а=>a", "п=>p", "р=>r", "о=>o", "л=>l", "д=>d",
+            "ж=>zh", "э=>e", "я=>ya", "ч=>ch", "с=>s", "м=>m", "и=>i",
+            "т=>t", "ь=>", "б=>b", "ю=>yu"
+          ]
+        }
+      },
+      "analyzer": {
+        "prefix_index": {
+          "tokenizer": "standard",
+          "char_filter": ["translit"],
+          "filter": ["lowercase", "edge_15"]
+        },
+        "prefix_search": {
+          "tokenizer": "standard",
+          "char_filter": ["translit"],
+          "filter": ["lowercase"]
+        }
+      }
+    }
+  },
+  "mappings": {
+    "properties": {
+      "id": { "type": "keyword" },
+      "name": {
+        "type": "text",
+        "analyzer": "prefix_index",
+        "search_analyzer": "prefix_search",
+        "fields": {
+          "says": { "type": "search_as_you_type" }
+        }
+      },
+      "brand": {
+        "type": "text",
+        "analyzer": "prefix_index",
+        "search_analyzer": "prefix_search",
+        "fields": {
+          "raw": { "type": "keyword" }
+        }
+      },
+      "category": {
+        "type": "keyword"
+      },
+      "keywords": {
+        "type": "text",
+        "analyzer": "prefix_index",
+        "search_analyzer": "prefix_search"
+      },
+      "description": {
+        "type": "text",
+        "analyzer": "prefix_index",
+        "search_analyzer": "prefix_search"
+      },
+      "weight": {
+        "type": "float"
+      },
+      "weight_unit": {
+        "type": "keyword"
+      },
+      "package_size": {
+        "type": "float"
+      },
+      "price": {
+        "type": "float"
+      },
+      "image_url": {
+        "type": "keyword",
+        "index": false
+      }
+    }
+  }
+}

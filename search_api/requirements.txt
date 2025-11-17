@@ -1,0 +1,12 @@
+# API
+fastapi
+uvicorn
+opensearch-py
+transliterate
+requests
+
+# Parsing, XML, utilities
+lxml
+
+# Optional debug
+python-dotenv

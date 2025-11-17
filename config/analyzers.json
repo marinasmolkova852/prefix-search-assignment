@@ -1,0 +1,76 @@
+{
+  "settings": {
+    "analysis": {
+      "filter": {
+        "russian_stop": {
+          "type": "stop",
+          "stopwords": "_russian_"
+        },
+        "english_stop": {
+          "type": "stop",
+          "stopwords": "_english_"
+        },
+        "edge_ngram_filter": {
+          "type": "edge_ngram",
+          "min_gram": 1,
+          "max_gram": 15
+        }
+      },
+      "tokenizer": {
+        "edge_ngram_tokenizer": {
+          "type": "edge_ngram",
+          "min_gram": 1,
+          "max_gram": 15,
+          "token_chars": ["letter", "digit"]
+        }
+      },
+      "analyzer": {
+        "default_text_analyzer": {
+          "type": "custom",
+          "tokenizer": "standard",
+          "filter": ["lowercase", "russian_stop", "english_stop"]
+        },
+        "edge_ngram_analyzer": {
+          "type": "custom",
+          "tokenizer": "edge_ngram_tokenizer",
+          "filter": ["lowercase"]
+        }
+      }
+    }
+  },
+  "mappings": {
+    "properties": {
+      "name": {
+        "type": "text",
+        "analyzer": "default_text_analyzer",
+        "search_analyzer": "default_text_analyzer"
+      },
+      "keywords": {
+        "type": "text",
+        "analyzer": "default_text_analyzer"
+      },
+      "category": {
+        "type": "keyword"
+      },
+      "brand": {
+        "type": "keyword"
+      },
+      "description": {
+        "type": "text",
+        "analyzer": "default_text_analyzer"
+      },
+      "weight": {
+        "type": "float"
+      },
+      "package_size": {
+        "type": "integer"
+      },
+      "price": {
+        "type": "float"
+      },
+      "image_url": {
+        "type": "keyword"
+      }
+    }
+  }
+}
