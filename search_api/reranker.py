@@ -1,82 +1,82 @@
-# search_api/reranker_smart.py
+# search_api/reranker.py
 import re
-from typing import List, Dict
+from difflib import SequenceMatcher
+from transliterate import translit
 
-# Транслитерация и раскладка
-CYR_TO_LAT = str.maketrans(
-    "абвгдеёжзийклмнопрстуфхцчшщьыэюя",
-    "abvgdeezhziyklmnoprstufhtschshsh'yeiuya"
-)
-QWERTY_TO_YCUKEN = str.maketrans(
-    "qwertyuiop[]asdfghjkl;zxcvbnm,./",
-    "йцукенгшщзхъфывапролджэячсмитьбю"
-)
 
 def normalize(text: str) -> str:
-    text = text.lower()
-    text = text.translate(CYR_TO_LAT)
-    text = text.translate(QWERTY_TO_YCUKEN)
-    text = re.sub(r"[^a-z0-9\s]", " ", text)
-    text = re.sub(r"\s+", " ", text).strip()
-    return text
+    if not text:
+        return ""
+    text = text.lower().strip()
+    # транслитерация → русские буквы
+    try:
+        text = translit(text, "ru")
+    except Exception:
+        pass
+    text = re.sub(r"[^a-zа-я0-9\s]", " ", text)
+    text = re.sub(r"\s+", " ", text)
+    return text.strip()
 
-def extract_numbers(text: str) -> List[int]:
-    return [int(n) for n in re.findall(r"\d+", text)]
 
-def score_item(query: str, item: Dict, expected_category: str = None) -> float:
-    score = 0.0
-    norm_query = normalize(query)
-    text_fields = f"{item.get('name','')} {item.get('keywords','')}"
-    norm_text = normalize(text_fields)
-    query_words = norm_query.split()
+def prefix_score(query: str, name: str) -> float:
+    """Оценка префикса — насколько хорошо q совпадает с началом слова."""
+    name = name.lower()
+    query = query.lower()
 
-    for w in query_words:
-        if w in norm_text:
-            score += 2.0
-        elif len(w) <= 3 and norm_text.startswith(w):
-            score += 1.0
+    if name.startswith(query):
+        return 1.0
+    if query in name:
+        return 0.6
+    return 0.0
 
-    if expected_category and item.get("category") == expected_category:
-        score += 3.0
 
-    brand = item.get("brand","")
-    if normalize(brand) in norm_text:
-        score += 2.0
+def fuzzy_score(q: str, text: str) -> float:
+    """Fuzzy similarity."""
+    return SequenceMatcher(None, q, text).ratio()
 
-    query_nums = extract_numbers(norm_query)
-    for key in ["weight", "package_size"]:
-        val = item.get(key)
-        if val is not None:
-            for qn in query_nums:
-                if abs(qn - val) <= 1:
-                    score += 1.5
 
-    for w in query_words:
-        if norm_text.startswith(w):
-            score += 1.0
+def category_bonus(hit, expected_category):
+    """Если пользовательский store подразумевает категорию — усиливаем совпадение."""
+    if not expected_category:
+        return 0
+    if hit.get("category") == expected_category:
+        return 0.5
+    return 0
 
-    return score
 
-def is_garbage(query: str, item: Dict, min_word_matches: int = 1) -> bool:
+def rerank_smart(query: str, hits, expected_category=None):
     """
-    Фильтр «мусорных» результатов:
-    - должно совпадать хотя бы min_word_matches слов из запроса
-    - если указан expected_category, категория должна совпадать
+    Комбинированный reranker:
+    - нормализованный prefix score
+    - fuzzy score
+    - category/brand бусты
     """
-    norm_query = normalize(query)
-    norm_text = normalize(f"{item.get('name','')} {item.get('keywords','')}")
-    matches = sum(1 for w in norm_query.split() if w in norm_text)
-    if matches < min_word_matches:
-        return True
-    return False
 
-def rerank_smart(query: str, results: List[Dict], expected_category: str = None) -> List[Dict]:
-    """
-    Умный reranker с фильтром «мусорных» результатов:
-    - boost по префиксам, числам, бренду, категории
-    - отбрасывает результаты, не совпадающие хотя бы частично с запросом
-    """
-    filtered = [r for r in results if not is_garbage(query, r)]
-    scored = [(score_item(query, r, expected_category), r) for r in filtered]
-    ranked = [r for s, r in sorted(scored, key=lambda x: x[0], reverse=True)]
-    return ranked
+    q_norm = normalize(query)
+
+    scored = []
+    for h in hits:
+        name = normalize(h.get("name", ""))
+        brand = normalize(h.get("brand", ""))
+
+        score = 0
+
+        # prefix
+        score += prefix_score(q_norm, name) * 2.0
+
+        # fuzzy name
+        score += fuzzy_score(q_norm, name) * 1.0
+
+        # fuzzy brand
+        score += fuzzy_score(q_norm, brand) * 0.8
+
+        # category bonus (если магазин Store C/B/E/F → подсказывает категорию)
+        score += category_bonus(h, expected_category)
+
+        scored.append((score, h))
+
+    # сортировка по убыванию
+    scored.sort(key=lambda x: x[0], reverse=True)
+
+    return [h for score, h in scored]
+
